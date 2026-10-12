@@ -1,0 +1,122 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: qaudit-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+      POSTGRES_DB: qaudit
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d qaudit"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: qaudit-backend
+    restart: always
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgrespassword@postgres:5432/qaudit
+      - SECRET_KEY=qaudit-national-hackathon-pqc-super-secure-key-2026-xyz789
+      - QRNG_USE_FALLBACK=True
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: qaudit-frontend
+    restart: always
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+  validator1:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: qaudit-validator-1-gov
+    environment:
+      - VALIDATOR_ID=VAL-GOV-01
+      - ORG_NAME=National Election Authority
+      - ORG_TYPE=GOVERNMENT
+      - BACKEND_API_URL=http://backend:8000
+    command: ["python", "-m", "app.validators.node_daemon", "--id", "VAL-GOV-01", "--org", "National Election Authority", "--type", "GOVERNMENT"]
+    depends_on:
+      - backend
+
+  validator2:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: qaudit-validator-2-audit
+    environment:
+      - VALIDATOR_ID=VAL-AUD-02
+      - ORG_NAME=Independent Electoral Audit Commission
+      - ORG_TYPE=AUDITOR
+      - BACKEND_API_URL=http://backend:8000
+    command: ["python", "-m", "app.validators.node_daemon", "--id", "VAL-AUD-02", "--org", "Independent Electoral Audit Commission", "--type", "AUDITOR"]
+    depends_on:
+      - backend
+
+  validator3:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: qaudit-validator-3-acad
+    environment:
+      - VALIDATOR_ID=VAL-ACAD-03
+      - ORG_NAME=Quantum Security Research Institute
+      - ORG_TYPE=ACADEMIC
+      - BACKEND_API_URL=http://backend:8000
+    command: ["python", "-m", "app.validators.node_daemon", "--id", "VAL-ACAD-03", "--org", "Quantum Security Research Institute", "--type", "ACADEMIC"]
+    depends_on:
+      - backend
+
+  validator4:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: qaudit-validator-4-obs
+    environment:
+      - VALIDATOR_ID=VAL-OBS-04
+      - ORG_NAME=International Transparency Watch
+      - ORG_TYPE=OBSERVER
+      - BACKEND_API_URL=http://backend:8000
+    command: ["python", "-m", "app.validators.node_daemon", "--id", "VAL-OBS-04", "--org", "International Transparency Watch", "--type", "OBSERVER"]
+    depends_on:
+      - backend
+
+  validator5:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: qaudit-validator-5-sec
+    environment:
+      - VALIDATOR_ID=VAL-SEC-05
+      - ORG_NAME=National Cyber Defense Command
+      - ORG_TYPE=SECURITY
+      - BACKEND_API_URL=http://backend:8000
+    command: ["python", "-m", "app.validators.node_daemon", "--id", "VAL-SEC-05", "--org", "National Cyber Defense Command", "--type", "SECURITY"]
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
